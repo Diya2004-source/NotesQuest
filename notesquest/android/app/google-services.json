@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "385497871982",
+    "project_id": "quest-227e4",
+    "storage_bucket": "quest-227e4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:385497871982:android:764b1b2cc9fd201db2587f",
+        "android_client_info": {
+          "package_name": "com.example.notesquest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBD6sBb5MdBKm41h9u9zO-g-yya0dzh52M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
