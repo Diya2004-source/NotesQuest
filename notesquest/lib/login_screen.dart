@@ -23,6 +23,7 @@ class _loginState extends State<login> {
   bool isPasswordVisible = false;
   bool isLoading = false;
 
+  // ---------------- INPUT STYLE ----------------
   InputDecoration inputStyle(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
@@ -36,14 +37,14 @@ class _loginState extends State<login> {
     );
   }
 
-  // ---------------- login ----------------
+  // ---------------- LOGIN ----------------
   Future<void> loginUser() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => isLoading = true);
 
     try {
-      UserCredential userCredential =
+      final userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
@@ -51,29 +52,27 @@ class _loginState extends State<login> {
 
       final uid = userCredential.user!.uid;
 
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
+      final userRef =
+          FirebaseFirestore.instance.collection('users').doc(uid);
 
-      // AUTO CREATE USER DOC IF NOT EXISTS
+      final doc = await userRef.get();
+
+      // create user doc if missing
       if (!doc.exists) {
-        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        await userRef.set({
           "email": userCredential.user!.email,
           "role": "user",
+          "isPremium": false,
         });
       }
 
-      final userData = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
+      final data = (await userRef.get()).data() as Map<String, dynamic>;
+      final role = data['role'] ?? "user";
 
-      final role = userData['role'] ?? "user";
-
+      if (!mounted) return;
       setState(() => isLoading = false);
 
-      if (role == "admin") {
+      if (role.toString().toLowerCase() == "admin") {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboard()),
@@ -85,15 +84,16 @@ class _loginState extends State<login> {
         );
       }
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() => isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "login failed")),
+        SnackBar(content: Text(e.message ?? "Login failed")),
       );
     }
   }
 
-  // ---------------- GOOGLE login ----------------
+  // ---------------- GOOGLE LOGIN ----------------
   Future<void> signInWithGoogle() async {
     try {
       final googleUser = await GoogleSignIn().signIn();
@@ -111,26 +111,24 @@ class _loginState extends State<login> {
 
       final uid = userCredential.user!.uid;
 
-      final doc = await FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid)
-          .get();
+      final userRef =
+          FirebaseFirestore.instance.collection("users").doc(uid);
+
+      final doc = await userRef.get();
 
       if (!doc.exists) {
-        await FirebaseFirestore.instance.collection("users").doc(uid).set({
+        await userRef.set({
           "email": userCredential.user!.email,
           "role": "user",
+          "isPremium": false,
         });
       }
 
-      final roleDoc = await FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid)
-          .get();
+      final role = (await userRef.get())['role'] ?? "user";
 
-      final role = roleDoc['role'] ?? "user";
+      if (!mounted) return;
 
-      if (role == "admin") {
+      if (role.toString().toLowerCase() == "admin") {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboard()),
@@ -142,6 +140,8 @@ class _loginState extends State<login> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Google Sign-In Failed")),
       );
@@ -162,6 +162,8 @@ class _loginState extends State<login> {
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Reset link sent to email"),
@@ -169,6 +171,8 @@ class _loginState extends State<login> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Error sending reset email"),
@@ -178,6 +182,14 @@ class _loginState extends State<login> {
     }
   }
 
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -190,6 +202,7 @@ class _loginState extends State<login> {
               key: _formKey,
               child: Column(
                 children: [
+
                   Image.asset("assets/Logo.png", height: 120),
 
                   const SizedBox(height: 20),
@@ -205,7 +218,6 @@ class _loginState extends State<login> {
 
                   const SizedBox(height: 30),
 
-                  // EMAIL
                   TextFormField(
                     controller: emailController,
                     style: const TextStyle(color: Colors.white),
@@ -216,12 +228,12 @@ class _loginState extends State<login> {
 
                   const SizedBox(height: 15),
 
-                  // PASSWORD
                   TextFormField(
                     controller: passwordController,
                     obscureText: !isPasswordVisible,
                     style: const TextStyle(color: Colors.white),
-                    decoration: inputStyle("Password", Icons.lock).copyWith(
+                    decoration:
+                        inputStyle("Password", Icons.lock).copyWith(
                       suffixIcon: IconButton(
                         icon: Icon(
                           isPasswordVisible
@@ -231,7 +243,8 @@ class _loginState extends State<login> {
                         ),
                         onPressed: () {
                           setState(() {
-                            isPasswordVisible = !isPasswordVisible;
+                            isPasswordVisible =
+                                !isPasswordVisible;
                           });
                         },
                       ),
@@ -255,44 +268,30 @@ class _loginState extends State<login> {
 
                   const SizedBox(height: 10),
 
-                  // login BUTTON
-                  // SizedBox(
-                  //   backgroundColor: Colors.blue,
-                  //   width: double.infinity,
-                  //   height: 50,
-                  //   child: ElevatedButton(
-                  //     onPressed: isLoading ? null : loginUser,
-                  //     child: isLoading
-                  //         ? const CircularProgressIndicator()
-                  //         : const Text("login"),
-                  //   ),
-                  // ),
-
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
+                      onPressed: isLoading ? null : loginUser,
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        backgroundColor: Colors.blue,
                       ),
-                      onPressed: loginUser,
-                      child: const Text(
-                        "Login",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                          fontFamily: "Roboto",
-                        ),
-                      ),
+                      child: isLoading
+                          ? const CircularProgressIndicator(
+                              color: Colors.white,
+                            )
+                          : const Text(
+                              "Login",
+                              style: TextStyle(color: Colors.white),
+                            ),
                     ),
                   ),
 
                   const SizedBox(height: 15),
 
-                  // GOOGLE login
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -310,7 +309,8 @@ class _loginState extends State<login> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const registration(),
+                          builder: (context) =>
+                              const registration(),
                         ),
                       );
                     },

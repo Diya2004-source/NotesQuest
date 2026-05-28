@@ -9,7 +9,7 @@ import 'admin/admin_dashboard.dart';
 import 'admin/manage_users.dart';
 import 'admin/manage_quizzes.dart';
 import 'admin/manage_offers.dart';
-import 'admin/manage_plans.dart';
+import 'admin/manage_subscription.dart';
 import 'admin/reports_page.dart';
 import 'admin/edit_profile.dart';
 

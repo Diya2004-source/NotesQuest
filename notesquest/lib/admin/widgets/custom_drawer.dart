@@ -33,7 +33,7 @@ class CustomDrawer extends StatelessWidget {
       backgroundColor: const Color(0xFF0F172A),
       child: Column(
         children: [
-          //HEADER 
+          //HEADER
           Container(
             width: double.infinity,
             padding: const EdgeInsets.only(
@@ -44,10 +44,7 @@ class CustomDrawer extends StatelessWidget {
             ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  Color(0xFF2563EB),
-                  Color(0xFF7C3AED),
-                ],
+                colors: [Color.fromARGB(255, 116, 14, 176), Color(0xFF7C3AED)],
               ),
             ),
 
@@ -58,12 +55,17 @@ class CustomDrawer extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(
-                      Icons.menu,
-                      color: Colors.white,
-                      size: 28,
-                    ),
+                    InkWell(
+                      onTap: () {
+                        Navigator.pop(context); // CLOSE DRAWER
+                      },
 
+                      child: const Icon(
+                        Icons.menu,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
                     // EDIT PROFILE BUTTON
                     InkWell(
                       onTap: () {
@@ -101,10 +103,7 @@ class CustomDrawer extends StatelessWidget {
 
                 const Text(
                   "Manage your Quest platform",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
             ),
