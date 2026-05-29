@@ -17,171 +17,319 @@ class login extends StatefulWidget {
 class _loginState extends State<login> {
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController emailController =
+      TextEditingController();
+
+  final TextEditingController passwordController =
+      TextEditingController();
 
   bool isPasswordVisible = false;
   bool isLoading = false;
 
-  // ---------------- INPUT STYLE ----------------
-  InputDecoration inputStyle(String label, IconData icon) {
+  // ================= INPUT STYLE =================
+  InputDecoration inputStyle(
+    String label,
+    IconData icon,
+  ) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: Colors.white70),
+
+      prefixIcon: Icon(
+        icon,
+        color: Colors.white70,
+      ),
+
       filled: true,
       fillColor: Colors.white10,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+
+      labelStyle: const TextStyle(
+        color: Colors.white70,
       ),
-      labelStyle: const TextStyle(color: Colors.white70),
+
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(
+          color: Colors.white.withOpacity(0.2),
+        ),
+      ),
+
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: Colors.blue,
+          width: 2,
+        ),
+      ),
+
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
     );
   }
 
-  // ---------------- LOGIN ----------------
+  // ================= LOGIN =================
   Future<void> loginUser() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => isLoading = true);
+    FocusScope.of(context).unfocus();
+
+    if (mounted) {
+      setState(() => isLoading = true);
+    }
 
     try {
-      final userCredential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+      UserCredential userCredential =
+          await FirebaseAuth.instance
+              .signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
       final uid = userCredential.user!.uid;
 
-      final userRef =
-          FirebaseFirestore.instance.collection('users').doc(uid);
+      final userRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid);
 
       final doc = await userRef.get();
 
-      // create user doc if missing
+      // CREATE USER DOC IF NOT EXISTS
       if (!doc.exists) {
         await userRef.set({
           "email": userCredential.user!.email,
           "role": "user",
           "isPremium": false,
+          "paymentStatus": "unpaid",
+          "createdAt": FieldValue.serverTimestamp(),
         });
       }
 
-      final data = (await userRef.get()).data() as Map<String, dynamic>;
-      final role = data['role'] ?? "user";
+      final updatedDoc = await userRef.get();
+
+      final data =
+          updatedDoc.data() as Map<String, dynamic>;
+
+      final role =
+          data['role']?.toString().toLowerCase() ??
+              "user";
 
       if (!mounted) return;
+
       setState(() => isLoading = false);
 
-      if (role.toString().toLowerCase() == "admin") {
+      // ================= ADMIN =================
+      if (role == "admin") {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const AdminDashboard()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const PaymentPage()),
+          MaterialPageRoute(
+            builder: (context) =>
+                const AdminDashboard(),
+          ),
         );
       }
-    } on FirebaseAuthException catch (e) {
+
+      // ================= USER =================
+      else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const PaymentPage(),
+          ),
+        );
+      }
+    }
+
+    // ================= FIREBASE ERROR =================
+    on FirebaseAuthException catch (e) {
       if (!mounted) return;
+
+      setState(() => isLoading = false);
+
+      String message = "Login failed";
+
+      switch (e.code) {
+        case 'invalid-email':
+          message = "Invalid email format";
+          break;
+
+        case 'user-not-found':
+          message = "No user found";
+          break;
+
+        case 'wrong-password':
+          message = "Wrong password";
+          break;
+
+        case 'invalid-credential':
+          message =
+              "Incorrect email or password";
+          break;
+
+        case 'network-request-failed':
+          message = "No internet connection";
+          break;
+
+        default:
+          message = e.message ?? "Login failed";
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(message),
+        ),
+      );
+    }
+
+    // ================= UNKNOWN ERROR =================
+    catch (e) {
+      if (!mounted) return;
+
       setState(() => isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Login failed")),
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(
+            "Something went wrong: $e",
+          ),
+        ),
       );
     }
   }
 
-  // ---------------- GOOGLE LOGIN ----------------
+  // ================= GOOGLE LOGIN =================
   Future<void> signInWithGoogle() async {
     try {
-      final googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAccount? googleUser =
+          await GoogleSignIn().signIn();
+
       if (googleUser == null) return;
 
-      final googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
-      final credential = GoogleAuthProvider.credential(
+      final credential =
+          GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
+      UserCredential userCredential =
+          await FirebaseAuth.instance
+              .signInWithCredential(credential);
 
       final uid = userCredential.user!.uid;
 
-      final userRef =
-          FirebaseFirestore.instance.collection("users").doc(uid);
+      final userRef = FirebaseFirestore.instance
+          .collection("users")
+          .doc(uid);
 
       final doc = await userRef.get();
 
+      // CREATE USER IF NOT EXISTS
       if (!doc.exists) {
         await userRef.set({
+          "name":
+              userCredential.user!.displayName ?? "",
           "email": userCredential.user!.email,
           "role": "user",
           "isPremium": false,
+          "paymentStatus": "unpaid",
+          "createdAt": FieldValue.serverTimestamp(),
         });
       }
 
-      final role = (await userRef.get())['role'] ?? "user";
+      final updatedDoc = await userRef.get();
+
+      final data =
+          updatedDoc.data() as Map<String, dynamic>;
+
+      final role =
+          data['role']?.toString().toLowerCase() ??
+              "user";
 
       if (!mounted) return;
 
-      if (role.toString().toLowerCase() == "admin") {
+      if (role == "admin") {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const AdminDashboard()),
+          MaterialPageRoute(
+            builder: (context) =>
+                const AdminDashboard(),
+          ),
         );
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const PaymentPage()),
+          MaterialPageRoute(
+            builder: (context) =>
+                const PaymentPage(),
+          ),
         );
       }
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Google Sign-In Failed")),
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(
+            "Google Sign-In Failed",
+          ),
+        ),
       );
     }
   }
 
-  // ---------------- FORGOT PASSWORD ----------------
+  // ================= FORGOT PASSWORD =================
   Future<void> forgotPassword() async {
     final email = emailController.text.trim();
 
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter email first")),
+        const SnackBar(
+          content: Text(
+            "Enter email first",
+          ),
+        ),
       );
       return;
     }
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(
+        email: email,
+      );
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Reset link sent to email"),
           backgroundColor: Colors.green,
+          content: Text(
+            "Password reset link sent!",
+          ),
         ),
       );
-    } catch (e) {
+    } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error sending reset email"),
+        SnackBar(
           backgroundColor: Colors.red,
+          content: Text(
+            e.message ??
+                "Error sending reset email",
+          ),
         ),
       );
     }
   }
 
+  // ================= DISPOSE =================
   @override
   void dispose() {
     emailController.dispose();
@@ -189,51 +337,105 @@ class _loginState extends State<login> {
     super.dispose();
   }
 
-  // ---------------- UI ----------------
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
+
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
+
             child: Form(
               key: _formKey,
+
               child: Column(
                 children: [
 
-                  Image.asset("assets/Logo.png", height: 120),
+                  // ================= LOGO =================
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius:
+                          BorderRadius.circular(24),
+                    ),
 
-                  const SizedBox(height: 20),
+                    child: Image.asset(
+                      "assets/Logo.png",
+                      height: 110,
+                    ),
+                  ),
 
+                  const SizedBox(height: 25),
+
+                  // ================= TITLE =================
                   const Text(
                     "Welcome Back",
                     style: TextStyle(
-                      fontSize: 26,
+                      fontSize: 30,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 8),
 
-                  TextFormField(
-                    controller: emailController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: inputStyle("Email", Icons.email),
-                    validator: (v) =>
-                        v!.isEmpty ? "Enter email" : null,
+                  const Text(
+                    "Login to continue your journey",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 15,
+                    ),
                   ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 35),
 
+                  // ================= EMAIL =================
+                  TextFormField(
+                    controller: emailController,
+
+                    style: const TextStyle(
+                      color: Colors.white,
+                    ),
+
+                    decoration: inputStyle(
+                      "Email",
+                      Icons.email_outlined,
+                    ),
+
+                    validator: (value) {
+                      if (value == null ||
+                          value.isEmpty) {
+                        return "Enter email";
+                      }
+
+                      if (!value.contains("@")) {
+                        return "Enter valid email";
+                      }
+
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // ================= PASSWORD =================
                   TextFormField(
                     controller: passwordController,
+
                     obscureText: !isPasswordVisible,
-                    style: const TextStyle(color: Colors.white),
-                    decoration:
-                        inputStyle("Password", Icons.lock).copyWith(
+
+                    style: const TextStyle(
+                      color: Colors.white,
+                    ),
+
+                    decoration: inputStyle(
+                      "Password",
+                      Icons.lock_outline,
+                    ).copyWith(
                       suffixIcon: IconButton(
                         icon: Icon(
                           isPasswordVisible
@@ -249,75 +451,151 @@ class _loginState extends State<login> {
                         },
                       ),
                     ),
-                    validator: (v) =>
-                        v!.length < 6 ? "Min 6 chars required" : null,
+
+                    validator: (value) {
+                      if (value == null ||
+                          value.isEmpty) {
+                        return "Enter password";
+                      }
+
+                      if (value.length < 6) {
+                        return "Minimum 6 characters";
+                      }
+
+                      return null;
+                    },
                   ),
 
                   const SizedBox(height: 10),
 
+                  // ================= FORGOT PASSWORD =================
                   Align(
                     alignment: Alignment.centerRight,
+
                     child: TextButton(
                       onPressed: forgotPassword,
+
                       child: const Text(
                         "Forgot Password?",
-                        style: TextStyle(color: Colors.white70),
+                        style: TextStyle(
+                          color: Colors.white70,
+                        ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 15),
 
+                  // ================= LOGIN BUTTON =================
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 55,
+
                     child: ElevatedButton(
-                      onPressed: isLoading ? null : loginUser,
+                      onPressed:
+                          isLoading ? null : loginUser,
+
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor:
+                            const Color(0xFF2563EB),
+
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius:
+                              BorderRadius.circular(14),
                         ),
                       ),
+
                       child: isLoading
                           ? const CircularProgressIndicator(
                               color: Colors.white,
                             )
                           : const Text(
                               "Login",
-                              style: TextStyle(color: Colors.white),
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                                fontWeight:
+                                    FontWeight.bold,
+                              ),
                             ),
                     ),
                   ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 18),
 
+                  // ================= GOOGLE BUTTON =================
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 55,
+
                     child: OutlinedButton.icon(
                       onPressed: signInWithGoogle,
-                      icon: const Icon(Icons.g_mobiledata),
-                      label: const Text("Sign in with Google"),
+
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color:
+                              Colors.white.withOpacity(0.3),
+                        ),
+
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(14),
+                        ),
+                      ),
+
+                      icon: const Icon(
+                        Icons.g_mobiledata,
+                        size: 32,
+                        color: Colors.white,
+                      ),
+
+                      label: const Text(
+                        "Sign in with Google",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 25),
 
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const registration(),
+                  // ================= REGISTER =================
+                  Row(
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
+
+                    children: [
+
+                      const Text(
+                        "Don't have an account?",
+                        style: TextStyle(
+                          color: Colors.white70,
                         ),
-                      );
-                    },
-                    child: const Text(
-                      "Don't have an account? Register",
-                      style: TextStyle(color: Colors.white70),
-                    ),
+                      ),
+
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const registration(),
+                            ),
+                          );
+                        },
+
+                        child: const Text(
+                          "Register",
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

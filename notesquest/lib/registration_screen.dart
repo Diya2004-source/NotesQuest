@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_screen.dart';
 
@@ -11,9 +12,12 @@ class registration extends StatefulWidget {
 
 class _registrationState extends State<registration> {
   final _formKey = GlobalKey<FormState>();
-  bool isLoading = false;
 
-  // Controllers
+  bool isLoading = false;
+  bool isPasswordVisible = false;
+  bool isConfirmPasswordVisible = false;
+
+  // CONTROLLERS
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -36,204 +40,379 @@ class _registrationState extends State<registration> {
     super.dispose();
   }
 
-  InputDecoration inputStyle(String label) {
+  // ================= INPUT STYLE =================
+  InputDecoration inputStyle(
+    String label,
+    IconData icon,
+  ) {
     return InputDecoration(
       labelText: label,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      prefixIcon: Icon(icon, color: Colors.white70),
+      filled: true,
+      fillColor: Colors.white10,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      labelStyle: const TextStyle(
+        color: Colors.white70,
+      ),
     );
   }
 
-  void registerUser() async {
-    if (_formKey.currentState!.validate()) {
-      // We can implement the API call to register the user
+  // ================= REGISTER USER =================
+  Future<void> registerUser() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      setState(() => isLoading = true);
+    setState(() => isLoading = true);
 
-      try {
-        await FirebaseFirestore.instance.collection('users').add({
-          "name": nameController.text.trim(),
-          "email": emailController.text.trim(),
-          "password": passwordController.text.trim(),
-          "phone": phoneController.text.trim(),
-          "city": cityController.text.trim(),
-          "course": courseController.text.trim(),
-          "semester": semesterController.text.trim(),
+    try {
+      // CREATE USER IN FIREBASE AUTH
+      UserCredential userCredential =
+          await FirebaseAuth.instance
+              .createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
 
-          //not ask from user
-          "role": "User",
-          "createdAt": FieldValue.serverTimestamp(),
-          "isPremium": false,
-          "paymentStatus": "unpaid",
-        });
-        setState(() => isLoading = false);
+      // GET USER UID
+      String uid = userCredential.user!.uid;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Registration Successful")),
-        );
+      // SAVE USER DATA IN FIRESTORE
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set({
+        "name": nameController.text.trim(),
+        "email": emailController.text.trim(),
+        "phone": phoneController.text.trim(),
+        "city": cityController.text.trim(),
+        "course": courseController.text.trim(),
+        "semester": semesterController.text.trim(),
 
-        //Redirect to login page
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const login()),
-        );
-      } catch (e) {
-        print("Error: $e");
-      }
-      ScaffoldMessenger.of(
+        // DEFAULT VALUES
+        "role": "user",
+        "isPremium": false,
+        "paymentStatus": "unpaid",
+
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      setState(() => isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Registration Successful"),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // REDIRECT TO LOGIN
+      Navigator.pushReplacement(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Registration Successful")));
+        MaterialPageRoute(
+          builder: (context) => const login(),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
 
-      print("Name: ${nameController.text}");
-      print("Email: ${emailController.text}");
+      setState(() => isLoading = false);
+
+      String message = "";
+
+      switch (e.code) {
+        case 'email-already-in-use':
+          message = "Email already exists";
+          break;
+
+        case 'weak-password':
+          message = "Password is too weak";
+          break;
+
+        case 'invalid-email':
+          message = "Invalid email";
+          break;
+
+        default:
+          message = e.message ?? "Registration failed";
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(20),
+
             child: Form(
               key: _formKey,
+
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+
                   const SizedBox(height: 10),
 
                   const Text(
                     "Create Account",
                     style: TextStyle(
-                      fontSize: 26,
+                      color: Colors.white,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      fontFamily: "Poppins",
                     ),
                   ),
 
                   const SizedBox(height: 10),
 
-                  Image.asset('assets/Logo.png', height: 120),
+                  Image.asset(
+                    'assets/Logo.png',
+                    height: 120,
+                  ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 25),
 
+                  // NAME
                   TextFormField(
                     controller: nameController,
-                    decoration: inputStyle("Full Name"),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: inputStyle(
+                      "Full Name",
+                      Icons.person,
+                    ),
                     validator: (value) =>
-                        value!.isEmpty ? "Enter your name" : null,
+                        value!.isEmpty
+                            ? "Enter your name"
+                            : null,
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 15),
 
+                  // EMAIL
                   TextFormField(
                     controller: emailController,
-                    decoration: inputStyle("Email"),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: inputStyle(
+                      "Email",
+                      Icons.email,
+                    ),
                     validator: (value) =>
-                        value!.contains("@") ? null : "Enter valid email",
+                        value!.contains("@")
+                            ? null
+                            : "Enter valid email",
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 15),
 
+                  // PASSWORD
                   TextFormField(
                     controller: passwordController,
-                    obscureText: true,
-                    decoration: inputStyle("Password"),
+                    obscureText: !isPasswordVisible,
+                    style: const TextStyle(color: Colors.white),
+
+                    decoration: inputStyle(
+                      "Password",
+                      Icons.lock,
+                    ).copyWith(
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          isPasswordVisible
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            isPasswordVisible =
+                                !isPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+
                     validator: (value) =>
-                        value!.length < 6 ? "Min 6 characters required" : null,
+                        value!.length < 6
+                            ? "Minimum 6 characters"
+                            : null,
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 15),
 
+                  // CONFIRM PASSWORD
                   TextFormField(
                     controller: confirmPasswordController,
-                    obscureText: true,
-                    decoration: inputStyle("Confirm Password"),
+                    obscureText:
+                        !isConfirmPasswordVisible,
+                    style: const TextStyle(color: Colors.white),
+
+                    decoration: inputStyle(
+                      "Confirm Password",
+                      Icons.lock_outline,
+                    ).copyWith(
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          isConfirmPasswordVisible
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            isConfirmPasswordVisible =
+                                !isConfirmPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+
                     validator: (value) {
-                      if (value != passwordController.text) {
+                      if (value !=
+                          passwordController.text) {
                         return "Passwords do not match";
                       }
                       return null;
                     },
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 15),
 
+                  // PHONE
                   TextFormField(
                     controller: phoneController,
                     keyboardType: TextInputType.number,
-                    decoration: inputStyle("Phone Number"),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: inputStyle(
+                      "Phone Number",
+                      Icons.phone,
+                    ),
                     validator: (value) =>
-                        value!.length != 10 ? "Enter valid phone number" : null,
+                        value!.length != 10
+                            ? "Enter valid phone number"
+                            : null,
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 15),
 
+                  // CITY
                   TextFormField(
                     controller: cityController,
-                    decoration: inputStyle("City"),
-                    validator: (value) => value!.isEmpty ? "Enter city" : null,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: inputStyle(
+                      "City",
+                      Icons.location_city,
+                    ),
+                    validator: (value) =>
+                        value!.isEmpty
+                            ? "Enter city"
+                            : null,
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 15),
 
+                  // COURSE
                   TextFormField(
                     controller: courseController,
-                    decoration: inputStyle("Course"),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: inputStyle(
+                      "Course",
+                      Icons.school,
+                    ),
                     validator: (value) =>
-                        value!.isEmpty ? "Enter course" : null,
+                        value!.isEmpty
+                            ? "Enter course"
+                            : null,
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 15),
 
+                  // SEMESTER
                   TextFormField(
                     controller: semesterController,
-                    decoration: inputStyle("Semester"),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: inputStyle(
+                      "Semester",
+                      Icons.menu_book,
+                    ),
                     validator: (value) =>
-                        value!.isEmpty ? "Enter semester" : null,
+                        value!.isEmpty
+                            ? "Enter semester"
+                            : null,
                   ),
 
                   const SizedBox(height: 25),
 
+                  // REGISTER BUTTON
                   SizedBox(
                     width: double.infinity,
                     height: 50,
+
                     child: ElevatedButton(
+                      onPressed:
+                          isLoading ? null : registerUser,
+
                       style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                         backgroundColor: Colors.blue,
-                      ),
-                      onPressed: registerUser,
-                      child: const Text(
-                        "Register",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                          fontFamily: "Roboto",
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(12),
                         ),
                       ),
+
+                      child: isLoading
+                          ? const CircularProgressIndicator(
+                              color: Colors.white,
+                            )
+                          : const Text(
+                              "Register",
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 15),
 
-                  GestureDetector(
-                    onTap: () {
+                  // LOGIN
+                  TextButton(
+                    onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => login()),
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const login(),
+                        ),
                       );
                     },
                     child: const Text(
-                      'If you have an account? login here',
+                      "Already have an account? Login",
                       style: TextStyle(
                         color: Colors.white70,
-                        fontSize: 14,
-                        decoration: TextDecoration
-                            .underline, // optional (looks clickable)
                       ),
                     ),
                   ),
