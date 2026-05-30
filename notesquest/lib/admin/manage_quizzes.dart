@@ -17,42 +17,35 @@ class _QuizzesState extends State<Quizzes> {
   final courseController = TextEditingController();
   final topicController = TextEditingController();
 
-  List<TextEditingController> questionControllers = [];
+  final questionController = TextEditingController();
+  final optionAController = TextEditingController();
+  final optionBController = TextEditingController();
+  final optionCController = TextEditingController();
+  final optionDController = TextEditingController();
+  final answerController = TextEditingController();
 
   bool isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // DEFAULT 15 QUESTIONS
-    for (int i = 0; i < 15; i++) {
-      questionControllers.add(TextEditingController());
-    }
-  }
 
   @override
   void dispose() {
     courseController.dispose();
     topicController.dispose();
-
-    for (var controller in questionControllers) {
-      controller.dispose();
-    }
-
+    questionController.dispose();
+    optionAController.dispose();
+    optionBController.dispose();
+    optionCController.dispose();
+    optionDController.dispose();
+    answerController.dispose();
     super.dispose();
   }
 
-  // ================= INPUT STYLE =================
   InputDecoration inputStyle(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon, color: Colors.white70),
       filled: true,
       fillColor: Colors.white10,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       labelStyle: const TextStyle(color: Colors.white70),
     );
   }
@@ -64,16 +57,17 @@ class _QuizzesState extends State<Quizzes> {
     setState(() => isLoading = true);
 
     try {
-      List<String> questions = [];
-
-      for (var controller in questionControllers) {
-        questions.add(controller.text.trim());
-      }
-
       await FirebaseFirestore.instance.collection('quizzes').add({
         "category": courseController.text.trim(),
         "topic": topicController.text.trim(),
-        "questions": questions,
+        "question": questionController.text.trim(),
+        "options": {
+          "A": optionAController.text.trim(),
+          "B": optionBController.text.trim(),
+          "C": optionCController.text.trim(),
+          "D": optionDController.text.trim(),
+        },
+        "answer": answerController.text.trim().toUpperCase(),
         "createdBy": "Admin",
         "createdAt": FieldValue.serverTimestamp(),
       });
@@ -81,10 +75,12 @@ class _QuizzesState extends State<Quizzes> {
       // CLEAR
       courseController.clear();
       topicController.clear();
-
-      for (var controller in questionControllers) {
-        controller.clear();
-      }
+      questionController.clear();
+      optionAController.clear();
+      optionBController.clear();
+      optionCController.clear();
+      optionDController.clear();
+      answerController.clear();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -94,29 +90,22 @@ class _QuizzesState extends State<Quizzes> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: $e"),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
       );
     }
 
     setState(() => isLoading = false);
   }
 
-  // ================= DELETE QUIZ =================
+  // ================= DELETE =================
   Future<void> deleteQuiz(String id) async {
-    await FirebaseFirestore.instance
-        .collection('quizzes')
-        .doc(id)
-        .delete();
+    await FirebaseFirestore.instance.collection('quizzes').doc(id).delete();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-
       drawer: const CustomDrawer(),
       bottomNavigationBar: const CustomBottomNavbar(),
 
@@ -138,39 +127,17 @@ class _QuizzesState extends State<Quizzes> {
                           Scaffold.of(context).openDrawer();
                         }
                       },
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.menu,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: const Icon(Icons.menu, color: Colors.white),
                     ),
-
                     const Text(
-                      "Manage Quizzes",
+                      "MCQ Quiz Manager",
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white10,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.quiz,
-                        color: Colors.white,
-                      ),
-                    ),
+                    const Icon(Icons.quiz, color: Colors.white),
                   ],
                 ),
               ),
@@ -182,72 +149,90 @@ class _QuizzesState extends State<Quizzes> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // COURSE
                     TextFormField(
                       controller: courseController,
                       style: const TextStyle(color: Colors.white),
                       decoration:
                           inputStyle("Course / Category", Icons.school),
-                      validator: (value) =>
-                          value!.isEmpty ? "Enter course" : null,
+                      validator: (v) =>
+                          v!.isEmpty ? "Enter category" : null,
                     ),
 
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 12),
 
-                    // TOPIC
                     TextFormField(
                       controller: topicController,
                       style: const TextStyle(color: Colors.white),
                       decoration:
                           inputStyle("Quiz Topic", Icons.topic),
-                      validator: (value) =>
-                          value!.isEmpty ? "Enter topic" : null,
+                      validator: (v) =>
+                          v!.isEmpty ? "Enter topic" : null,
                     ),
 
                     const SizedBox(height: 20),
 
-                    // ================= QUESTIONS =================
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Add 15 Questions",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    TextFormField(
+                      controller: questionController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration:
+                          inputStyle("Question", Icons.help),
+                      validator: (v) =>
+                          v!.isEmpty ? "Enter question" : null,
                     ),
 
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 12),
 
-                    Column(
-                      children: List.generate(
-                        questionControllers.length,
-                        (index) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: TextFormField(
-                              controller: questionControllers[index],
-                              style:
-                                  const TextStyle(color: Colors.white),
-                              maxLines: 2,
-                              decoration: inputStyle(
-                                "Question ${index + 1}",
-                                Icons.help_outline,
-                              ),
-                              validator: (value) => value!.isEmpty
-                                  ? "Enter question"
-                                  : null,
-                            ),
-                          );
-                        },
-                      ),
+                    TextFormField(
+                      controller: optionAController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: inputStyle("Option A", Icons.looks_one),
+                      validator: (v) =>
+                          v!.isEmpty ? "Enter option A" : null,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: optionBController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: inputStyle("Option B", Icons.looks_two),
+                      validator: (v) =>
+                          v!.isEmpty ? "Enter option B" : null,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: optionCController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: inputStyle("Option C", Icons.looks_3),
+                      validator: (v) =>
+                          v!.isEmpty ? "Enter option C" : null,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: optionDController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: inputStyle("Option D", Icons.looks_4),
+                      validator: (v) =>
+                          v!.isEmpty ? "Enter option D" : null,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: answerController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: inputStyle(
+                          "Correct Answer (A/B/C/D)", Icons.check),
+                      validator: (v) =>
+                          v!.isEmpty ? "Enter correct answer" : null,
                     ),
 
                     const SizedBox(height: 20),
 
-                    // ================= BUTTON =================
                     SizedBox(
                       width: double.infinity,
                       height: 55,
@@ -255,21 +240,14 @@ class _QuizzesState extends State<Quizzes> {
                         onPressed: isLoading ? null : addQuiz,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(12),
-                          ),
                         ),
                         child: isLoading
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
                               )
                             : const Text(
-                                "Add Quiz",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
+                                "Submit Quiz",
+                                style: TextStyle(color: Colors.white),
                               ),
                       ),
                     ),
@@ -277,147 +255,80 @@ class _QuizzesState extends State<Quizzes> {
                 ),
               ),
 
-              const SizedBox(height: 35),
+              const SizedBox(height: 30),
 
-              // ================= QUIZ LIST =================
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "All Quizzes",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
+              // ================= LIST =================
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('quizzes')
                     .orderBy('createdAt', descending: true)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return const Text(
-                      "Something went wrong",
-                      style: TextStyle(color: Colors.white),
-                    );
-                  }
-
                   if (!snapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                    return const CircularProgressIndicator();
                   }
 
                   final docs = snapshot.data!.docs;
 
-                  if (docs.isEmpty) {
-                    return const Text(
-                      "No quizzes added yet",
-                      style: TextStyle(color: Colors.white70),
-                    );
-                  }
-
                   return ListView.builder(
-                    itemCount: docs.length,
                     shrinkWrap: true,
-                    physics:
-                        const NeverScrollableScrollPhysics(),
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: docs.length,
                     itemBuilder: (context, index) {
                       final data =
                           docs[index].data() as Map<String, dynamic>;
 
-                      final questions =
-                          List<String>.from(data['questions'] ?? []);
+                      final options =
+                          data['options'] as Map<String, dynamic>? ?? {};
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 15),
-                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white10,
-                          borderRadius:
-                              BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    data['topic'] ?? "",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight:
-                                          FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-
-                                IconButton(
-                                  onPressed: () =>
-                                      deleteQuiz(docs[index].id),
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              "${data['topic']}",
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
                             ),
+                            Text(
+                              "Q: ${data['question']}",
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            const SizedBox(height: 5),
+
+                            Text("A: ${options['A'] ?? ''}",
+                                style: const TextStyle(color: Colors.white70)),
+                            Text("B: ${options['B'] ?? ''}",
+                                style: const TextStyle(color: Colors.white70)),
+                            Text("C: ${options['C'] ?? ''}",
+                                style: const TextStyle(color: Colors.white70)),
+                            Text("D: ${options['D'] ?? ''}",
+                                style: const TextStyle(color: Colors.white70)),
 
                             const SizedBox(height: 5),
 
                             Text(
-                              "Course: ${data['category'] ?? ""}",
+                              "Answer: ${data['answer']}",
                               style: const TextStyle(
-                                color: Colors.white70,
-                              ),
+                                  color: Colors.greenAccent),
                             ),
 
-                            const SizedBox(height: 15),
-
-                            const Text(
-                              "Questions:",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.red),
+                                onPressed: () =>
+                                    deleteQuiz(docs[index].id),
                               ),
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            Column(
-                              children: List.generate(
-                                questions.length,
-                                (qIndex) {
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.only(
-                                      bottom: 8,
-                                    ),
-                                    child: Align(
-                                      alignment:
-                                          Alignment.centerLeft,
-                                      child: Text(
-                                        "${qIndex + 1}. ${questions[qIndex]}",
-                                        style: const TextStyle(
-                                          color:
-                                              Colors.white70,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
+                            )
                           ],
                         ),
                       );

@@ -67,15 +67,68 @@ class _loginState extends State<login> {
     );
   }
 
-  // ================= LOGIN =================
+  // ================= SAVE USER DATA =================
+  Future<void> saveUserData(User user) async {
+    final userRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid);
+
+    final doc = await userRef.get();
+
+    // CREATE USER DOC IF NOT EXISTS
+    if (!doc.exists) {
+      await userRef.set({
+        "name": user.displayName ?? "",
+        "email": user.email ?? "",
+        "role": "user",
+        "isPremium": false,
+        "paymentStatus": "unpaid",
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  // ================= CHECK ROLE & REDIRECT =================
+  Future<void> checkRoleAndNavigate(User user) async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final data = doc.data() as Map<String, dynamic>;
+
+    final role =
+        data['role']?.toString().toLowerCase() ??
+            "user";
+
+    if (!mounted) return;
+
+    if (role == "admin") {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const AdminDashboard(),
+        ),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const PaymentPage(),
+        ),
+      );
+    }
+  }
+
+  // ================= EMAIL PASSWORD LOGIN =================
   Future<void> loginUser() async {
     if (!_formKey.currentState!.validate()) return;
 
     FocusScope.of(context).unfocus();
 
-    if (mounted) {
-      setState(() => isLoading = true);
-    }
+    setState(() => isLoading = true);
 
     try {
       UserCredential userCredential =
@@ -85,62 +138,17 @@ class _loginState extends State<login> {
         password: passwordController.text.trim(),
       );
 
-      final uid = userCredential.user!.uid;
-
-      final userRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid);
-
-      final doc = await userRef.get();
-
-      // CREATE USER DOC IF NOT EXISTS
-      if (!doc.exists) {
-        await userRef.set({
-          "email": userCredential.user!.email,
-          "role": "user",
-          "isPremium": false,
-          "paymentStatus": "unpaid",
-          "createdAt": FieldValue.serverTimestamp(),
-        });
-      }
-
-      final updatedDoc = await userRef.get();
-
-      final data =
-          updatedDoc.data() as Map<String, dynamic>;
-
-      final role =
-          data['role']?.toString().toLowerCase() ??
-              "user";
+      await saveUserData(userCredential.user!);
 
       if (!mounted) return;
 
       setState(() => isLoading = false);
 
-      // ================= ADMIN =================
-      if (role == "admin") {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                const AdminDashboard(),
-          ),
-        );
-      }
-
-      // ================= USER =================
-      else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                const PaymentPage(),
-          ),
-        );
-      }
+      await checkRoleAndNavigate(
+        userCredential.user!,
+      );
     }
 
-    // ================= FIREBASE ERROR =================
     on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
@@ -182,7 +190,6 @@ class _loginState extends State<login> {
       );
     }
 
-    // ================= UNKNOWN ERROR =================
     catch (e) {
       if (!mounted) return;
 
@@ -202,10 +209,18 @@ class _loginState extends State<login> {
   // ================= GOOGLE LOGIN =================
   Future<void> signInWithGoogle() async {
     try {
+      setState(() => isLoading = true);
+
+      // SIGN OUT PREVIOUS ACCOUNT
+      await GoogleSignIn().signOut();
+
       final GoogleSignInAccount? googleUser =
           await GoogleSignIn().signIn();
 
-      if (googleUser == null) return;
+      if (googleUser == null) {
+        setState(() => isLoading = false);
+        return;
+      }
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
@@ -220,63 +235,38 @@ class _loginState extends State<login> {
           await FirebaseAuth.instance
               .signInWithCredential(credential);
 
-      final uid = userCredential.user!.uid;
-
-      final userRef = FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid);
-
-      final doc = await userRef.get();
-
-      // CREATE USER IF NOT EXISTS
-      if (!doc.exists) {
-        await userRef.set({
-          "name":
-              userCredential.user!.displayName ?? "",
-          "email": userCredential.user!.email,
-          "role": "user",
-          "isPremium": false,
-          "paymentStatus": "unpaid",
-          "createdAt": FieldValue.serverTimestamp(),
-        });
-      }
-
-      final updatedDoc = await userRef.get();
-
-      final data =
-          updatedDoc.data() as Map<String, dynamic>;
-
-      final role =
-          data['role']?.toString().toLowerCase() ??
-              "user";
+      await saveUserData(userCredential.user!);
 
       if (!mounted) return;
 
-      if (role == "admin") {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                const AdminDashboard(),
+      setState(() => isLoading = false);
+
+      await checkRoleAndNavigate(
+        userCredential.user!,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      setState(() => isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(
+            e.message ?? "Google Sign-In Failed",
           ),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                const PaymentPage(),
-          ),
-        );
-      }
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 
+      setState(() => isLoading = false);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           backgroundColor: Colors.red,
           content: Text(
-            "Google Sign-In Failed",
+            "Google Sign-In Failed: $e",
           ),
         ),
       );
@@ -529,7 +519,10 @@ class _loginState extends State<login> {
                     height: 55,
 
                     child: OutlinedButton.icon(
-                      onPressed: signInWithGoogle,
+                      onPressed:
+                          isLoading
+                              ? null
+                              : signInWithGoogle,
 
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
