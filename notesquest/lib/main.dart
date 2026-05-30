@@ -13,15 +13,19 @@ import 'admin/manage_subscription.dart';
 import 'admin/reports_page.dart';
 import 'admin/edit_profile.dart';
 
+// USER PAGES
+import './users/home_page.dart';
+import './users/screens/notes/notes_dashboard.dart';
+import './users/screens/profile/profile_page.dart';
+import './users/screens/quiz/quiz_list_page.dart';
+
 // LOGIN PAGE
 import 'login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const Quest());
 }
@@ -54,30 +58,29 @@ class Quest extends StatelessWidget {
 
       // ---------------- ROUTES ----------------
       routes: {
+        '/AdminDashboard': (context) => const AdminDashboard(),
 
-        '/AdminDashboard': (context) =>
-            const AdminDashboard(),
+        '/ManageUsers': (context) => const ManageUsers(),
 
-        '/ManageUsers': (context) =>
-            const ManageUsers(),
+        '/SubscriptionPlans': (context) => const SubscriptionPlans(),
 
-        '/SubscriptionPlans': (context) =>
-            const SubscriptionPlans(),
+        '/Reports': (context) => const Reports(),
 
-        '/Reports': (context) =>
-            const Reports(),
+        '/Offers': (context) => const Offers(),
 
-        '/Offers': (context) =>
-            const Offers(),
+        '/Quizzes': (context) => const Quizzes(),
 
-        '/Quizzes': (context) =>
-            const Quizzes(),
+        '/EditProfile': (context) => const EditProfilePage(),
 
-        '/EditProfile': (context) =>
-            const EditProfilePage(),
+        '/login': (context) => const login(),
 
-        '/login': (context) =>
-            const login(),
+        '/HomePage': (context) => const HomePage(),
+
+        '/QuizListPage': (context) => const QuizListPage(),
+
+        '/NotesPage': (context) => const NotesPage(),
+        
+        '/ProfilePage': (context) => const ProfilePage(),
       },
     );
   }
