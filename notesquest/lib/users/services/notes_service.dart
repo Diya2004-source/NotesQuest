@@ -1,0 +1,1 @@
+//AI API calling  POST request  save generated notes summarize notes

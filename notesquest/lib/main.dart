@@ -15,7 +15,7 @@ import 'admin/edit_profile.dart';
 
 // USER PAGES
 import './users/home_page.dart';
-import './users/screens/notes/notes_dashboard.dart';
+import './users/screens/notes/generated_notes_page.dart';
 import './users/screens/profile/profile_page.dart';
 import './users/screens/quiz/quiz_list_page.dart';
 
